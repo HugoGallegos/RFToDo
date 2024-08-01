@@ -1,0 +1,230 @@
+﻿@page "/"
+@using RFToDo.Client.Helpers
+@using RFToDo.Shared.DTO
+@inject IGoalService GoalService
+@inject ITaskService TaskService
+@inject DialogService DialogService
+<PageTitle>Metas</PageTitle>
+@inject SweetAlertService Swal
+@inject ISweetAlertMessage message
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: true))
+<section class="card shadow-sm mb-3  rounded row mt-1">
+    <div class="card-body">
+        <div class="m-1 Header">
+            <div class="titleHeader ms-4 text-gray-01 fs-3">Control de metas</div>
+        </div>
+    </div>
+</section>
+
+<div class="row h-100">
+    <div class="col-sm-12 col-md-4">
+        <section class="card shadow-sm">
+            <div class="card-body">
+                <button @onclick="()=>OpenAddGoal()" class="btn btn-primary fs-4">
+                    <i class="fa-solid fa-plus"></i>
+                    Nueva meta
+                </button>
+                <div class="row mt-2">
+
+                    @if (Goals.Count == 0)
+                    {
+                        <span>No se encontraron metas</span>
+                    }
+                    else
+                    {
+                        @foreach (var item in Goals)
+                        {
+                            <RadzenCard @onclick="(()=>LoadTasks(item.Id))">
+                                <RadzenColumn Size="7" class="rz-text-truncate">
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center">
+                                        <RadzenStack Gap="0">
+                                            <RadzenText TextStyle="TextStyle.Body1"><b>@item.Name</b></RadzenText>
+                                            <RadzenText TextStyle="TextStyle.Overline" class="rz-display-flex rz-mt-4 rz-mb-0">Fecha creada: @item.DateCreated</RadzenText>
+                                        </RadzenStack>
+                                    </RadzenStack>
+                                </RadzenColumn>
+                                <RadzenColumn Size="5" class="rz-text-truncate">
+                                    <button class="btn btn-sm" @onclick="(()=>OpenEditGoal(item))"><i class="fa-solid fa-pencil"></i></button>
+                                    <button class="btn btn-sm" @onclick="(()=>DeleteGoal(item))"><i class="fa-solid fa-trash-can"></i></button>
+                                </RadzenColumn>
+                                <hr style="border: none; background-color: rgba(0,0,0,.2); height: 1px; margin: 1rem 0;" />
+                                @* <RadzenText TextStyle="TextStyle.Overline" class="rz-display-flex rz-mt-4 rz-mb-0">Tareas commpletadas: @item.CompleteTasks / @item.TotalTasks </RadzenText>
+                                <RadzenProgressBar @bind-Value="@item.Percentage" /> *@
+                            </RadzenCard>
+                        }
+                    }
+                </div>
+            </div>
+        </section>
+    </div>
+    <div class="col-sm-12 col-md-7">
+        <section class="card shadow-sm">
+            <div class="card-body">
+                <button @onclick="()=>OpenAddTask()" class="btn btn-primary fs-4">
+                    <i class="fa-solid fa-plus"></i>
+                    Agregar tarea
+                </button>
+                <button @onclick="()=>FinishTask(selectedTask[0].Id)" class="btn btn-primary fs-4">
+                    <i class="fa-solid fa-check"></i>
+                    Completar tarea
+                </button>
+                @if (selectedTask != null)
+                {
+                    <button @onclick="()=>OpenEditTask(selectedTask[0])" class="btn btn-primary fs-4">
+                        <i class="fa-solid fa-pencil"></i>
+                        Editar
+                    </button>
+                }
+                <button @onclick="()=>DeleteTask(selectedTask[0])" class="btn btn-primary fs-4">
+                    <i class="fa-solid fa-trash-can"></i>
+                    Eliminar
+                </button>
+                <div class="row">
+                    <RadzenDataGrid @ref="grid" Data="@Tasks" TItem="Tasks" AllowSorting="true" AllowFiltering="true" AllowPaging="true"
+                                    PageSizeOptions="@pageSizeOptions" Responsive="true" FilterMode="FilterMode.Simple"
+                                    SelectionMode="DataGridSelectionMode.Multiple" @bind-Value=@selectedTask
+                                    PagerHorizontalAlign="HorizontalAlign.Center" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" LogicalFilterOperator="LogicalFilterOperator.Or">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="Tasks" Context="task" TextAlign="TextAlign.Center">
+                                <Template>
+                                    <RadzenSwitch @bind-Value=@task.Importance Name="cb1" Change="(()=>ImportanceTask(task.Id))" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="Tasks" Property="Name" Title="Tarea" TextAlign="TextAlign.Center" />
+                            <RadzenDataGridColumn TItem="Tasks" Property="DateCreated" Title="Fecha" TextAlign="TextAlign.Center" />
+                            <RadzenDataGridColumn TItem="Tasks" Context="task" Title="Estado" TextAlign="TextAlign.Center">
+                                <Template>
+                                    @if (task.Status == true)
+                                    {
+                                        <div class="btn btn-outline-success">Completada</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="btn btn-outline-danger">Abierta</div>
+                                    }
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+
+@code {
+    RadzenDataGrid<Tasks> grid;
+    public List<Goal> Goals = new List<Goal>();
+    public List<Tasks> Tasks = new List<Tasks>();
+    IList<Tasks> selectedTask;
+    Goal Goal = new Goal();
+    Tasks Task = new Tasks();
+    public int selectedGoal = 0;
+    string Response = "";
+    IEnumerable<int> pageSizeOptions = new int[] { 10, 20, 30, 50, 100, 200 };
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+    #region Goals
+    public async Task Load()
+    {
+        Goals = await GoalService.GetGoals();
+        var temp = await GoalService.GetGoalsDTO();
+    }
+    async Task OpenAddGoal()
+    {
+        Goal = new Goal();
+        var result = await DialogService.OpenAsync<GoalForm>("Agregar una nueva meta",
+        new Dictionary<string, object>() { { "Goal", Goal }, { "IsEdit", false } },
+        new Radzen.DialogOptions() { Width = "500px", Resizable = false, CloseDialogOnEsc = true, ShowClose = true });
+        if (result == true)
+        {
+            await Load();
+        }
+    }
+    async Task OpenEditGoal(Goal goal)
+    {
+        var result = await DialogService.OpenAsync<GoalForm>("Editar meta",
+        new Dictionary<string, object>() { { "Goal", goal }, { "IsEdit", true } },
+        new Radzen.DialogOptions() { Width = "500px", Resizable = false, CloseDialogOnEsc = true, ShowClose = true });
+        if (result == true)
+        {
+            await Load();
+        }
+    }
+
+    async Task DeleteGoal(Goal goal)
+    {
+        bool result = await message.SweetQuestion(Swal, "¿Está seguro?", "Que desea eliminar el elemento " + goal.Name, "warning");
+        if (result)
+        {
+            var resultDelete = await GoalService.DeleteGoal(goal.Id);
+            if (resultDelete == "success")
+            {
+                await Load();
+                await message.SweetMessege(Swal, "Eliminado", "La meta se ha eliminado", "success");
+            }
+            else
+            {
+                await message.SweetMessege(Swal, "Error", "No se ha eliminado la meta", "error");
+            }
+        }
+    }
+    #endregion
+    #region Tasks
+    async Task LoadTasks(int id)
+    {
+        Tasks = await TaskService.GetTasks(id);
+        selectedGoal = id;
+    }
+    async Task OpenAddTask()
+    {
+        Task = new Tasks();
+        var result = await DialogService.OpenAsync<TaskForm>("Agregar una nueva tarea",
+        new Dictionary<string, object>() { { "Task", Task }, { "IsEdit", false } },
+        new Radzen.DialogOptions() { Width = "500px", Resizable = false, CloseDialogOnEsc = true, ShowClose = true });
+        if (result == true)
+        {
+            await LoadTasks(selectedGoal);
+        }
+    }
+    async Task OpenEditTask(Tasks task)
+    {
+        var result = await DialogService.OpenAsync<TaskForm>("Editar tarea",
+        new Dictionary<string, object>() { { "Task", Task }, { "IsEdit", true } },
+        new Radzen.DialogOptions() { Width = "500px", Resizable = false, CloseDialogOnEsc = true, ShowClose = true });
+        if (result == true)
+        {
+            await LoadTasks(task.GoalId);
+        }
+    }
+    async Task ImportanceTask(int id)
+    {
+        var result = await TaskService.ImportanceTask(id);
+        Console.WriteLine(id);
+    }
+    async Task FinishTask(int id)
+    {
+        var result = await TaskService.FinishTask(id);
+    }
+    async Task DeleteTask(Tasks task)
+    {
+        bool result = await message.SweetQuestion(Swal, "¿Está seguro?", "Que desea eliminar el elemento " + task.Name, "warning");
+        if (result)
+        {
+            var resultDelete = await TaskService.DeleteTask(task.Id);
+            if (resultDelete == "success")
+            {
+                await Load();
+                await message.SweetMessege(Swal, "Eliminado", "La tarea se ha eliminado", "success");
+            }
+            else
+            {
+                await message.SweetMessege(Swal, "Error", "No se ha eliminado la tarea", "error");
+            }
+        }
+    }
+    #endregion
+
+}

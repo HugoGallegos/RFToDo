@@ -1,0 +1,76 @@
+﻿@using RFToDo.Client.Helpers
+@inject ITaskService TaskService
+@inject Radzen.DialogService DialogService
+@inject SweetAlertService Swal
+@inject ISweetAlertMessage message
+<EditForm Model="Task" OnValidSubmit="Save">
+    <div class="row mt-2">
+        <div class="form-group col-sm-12 col-md-6">
+            <label class="titleInput">Nombre</label>
+            <RadzenTextBox class="form-control input" @bind-Value=@Task.Name MaxLength="80" />
+        </div>
+    </div>
+    <div class="mt-2">
+        <button type="submit" class="btn btn-primary fs-4">
+            <i class="fa-solid fa-paper-plane mx-3"></i>Enviar
+        </button>
+    </div>
+    <div class="mt-2">
+        <button type="button" class="btn btn-secondary fs-4" @onclick="()=>DialogService.Close(false)">
+            <i class="fa-solid fa-paper-plane mx-3"></i>Enviar
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter]
+    public Tasks Task{ get; set; } 
+    [Parameter] public bool IsEdit { get; set; }
+    async Task Save()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(Task.Name))
+            {
+                await message.SweetMessege(Swal, "Error", "Favor de ingresar una tarea", "warning");
+            }
+            else
+            {
+                if (!IsEdit)
+                {
+                    Task.Status = false;
+                    Task.Importance = false;
+                    Task.DateCreated = DateTime.Now;
+                    var result = await TaskService.CreateTask(Task);
+                    if (result == "success")
+                    {
+                        await message.SweetMessege(Swal, "Agregada", "La tarea se ha agregado", "success");
+                        DialogService.Close(true);
+                    }
+                    else
+                    {
+                        await message.SweetMessege(Swal, "Error", "No se ha agregado la tarea", "error");
+                    }
+                }
+                else
+                {
+                    var result = await TaskService.UpdateTask(Task);
+                    if (result == "success")
+                    {
+                        await message.SweetMessege(Swal, "Actualizada", "La tarea se ha actualizado", "success");
+                        DialogService.Close(true);
+                    }
+                    else
+                    {
+                        await message.SweetMessege(Swal, "Error", "No se ha actualizado la tarea", "error");
+                    }
+                }
+            }
+        }
+        catch (Exception)
+        {
+            
+            throw;
+        }
+    }
+}

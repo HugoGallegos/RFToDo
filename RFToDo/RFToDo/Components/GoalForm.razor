@@ -1,0 +1,31 @@
+﻿
+@inject HttpClient Http
+@inject Radzen.DialogService DialogService
+<EditForm Model="Goal" OnValidSubmit="Save">
+    <div class="row mt-2">
+        <div class="form-group col-sm-12 col-md-6">
+            <label class="titleInput">Nombre</label>
+            <RadzenTextBox class="form-control input" @bind-Value=@Goal.Name MaxLength="80" />
+        </div>
+    </div>
+    <div class="mt-2">
+        <button type="submit" class="btn btn-primary fs-4">
+            <i class="fa-solid fa-paper-plane mx-3"></i>Enviar
+        </button>
+    </div>
+    <div class="mt-2">
+        <button type="button" class="btn btn-secondary fs-4" @onclick="()=>DialogService.Close(false)">
+            <i class="fa-solid fa-paper-plane mx-3"></i>Enviar
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter]
+    public Goal Goal{ get; set; } 
+    [Parameter] public bool IsEdit { get; set; }
+    async Task Save()
+    {
+        // var response= await Http.PostAsJsonAsync
+    }
+}
